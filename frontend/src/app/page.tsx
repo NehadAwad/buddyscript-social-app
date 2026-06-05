@@ -17,10 +17,16 @@ export default function HomePage() {
                 <p className="_social_login_content_para _mar_b40">
                   Social feed application
                 </p>
-                <div className="_social_login_form_btn">
+                <div className="_social_login_form_btn _mar_b16">
                   <Link href="/login" className="_social_login_form_btn_link _btn1">
                     Login
                   </Link>
+                </div>
+                <div className="_social_login_bottom_txt">
+                  <p className="_social_login_bottom_txt_para">
+                    Dont have an account?{" "}
+                    <Link href="/register">Create New Account</Link>
+                  </p>
                 </div>
               </div>
             </div>
