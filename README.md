@@ -5,7 +5,7 @@ Full-stack social feed application (Next.js, Express, PostgreSQL, TypeORM).
 ## Prerequisites
 
 - Node.js 20+
-- PostgreSQL 14+ running locally
+- PostgreSQL database ([Neon](https://neon.tech) recommended)
 
 Docker is optional and not required for development.
 
@@ -20,20 +20,14 @@ cp frontend/.env.local.example frontend/.env.local
 
 Edit `.env` if your Postgres credentials differ from the defaults.
 
-### 2. Database
+### 2. Database migrations
 
-Create the database and user (run once):
+Run once against your `DATABASE_URL` (Neon or local Postgres):
 
 ```bash
-chmod +x scripts/setup-local-db.sh
-./scripts/setup-local-db.sh
-```
-
-Or manually with `psql`:
-
-```sql
-CREATE USER appifylab WITH PASSWORD 'changeme';
-CREATE DATABASE social_feed OWNER appifylab;
+cd backend
+npm install
+npm run migration:run
 ```
 
 ### 3. Install dependencies
@@ -67,6 +61,18 @@ cd frontend && npm run dev
 | Frontend | http://localhost:3000 |
 | Backend  | http://localhost:4000/api/health |
 
+### Auth API
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| POST | `/api/auth/register` | Register (`firstName`, `lastName`, `email`, `password`) |
+| POST | `/api/auth/login` | Login (`email`, `password`) |
+| POST | `/api/auth/refresh` | Rotate tokens (uses `refresh_token` cookie) |
+| POST | `/api/auth/logout` | Logout and clear cookies |
+| GET | `/api/auth/me` | Current user (requires `access_token` cookie) |
+
+Tokens are stored in HTTP-only cookies. Send `credentials: 'include'` from the frontend.
+
 ### Port already in use?
 
 Change `BACKEND_PORT` in `.env` (e.g. `4001`) and update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match.
@@ -76,11 +82,12 @@ Change `BACKEND_PORT` in `.env` (e.g. `4001`) and update `NEXT_PUBLIC_API_URL` i
 ```
 ├── backend/              # Express API
 ├── frontend/             # Next.js App Router
-├── Base /                # Original HTML/CSS design reference
+├── Base /                # HTML/CSS design assets
 ├── .env.example          # Local env template (copy to .env)
 ├── docker-compose.yml    # Optional — not needed for local dev
-└── scripts/
-    └── setup-local-db.sh
+└── backend/src/
+    ├── entities/         # TypeORM models
+    └── migrations/       # Schema migrations
 ```
 
 ## Optional: Docker
