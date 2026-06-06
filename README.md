@@ -100,3 +100,34 @@ docker compose up --build
 ```
 
 For Docker, set `DATABASE_HOST=postgres` and `DATABASE_URL=postgresql://...@postgres:5432/...` in `.env`.
+
+## Deploy (Netlify + Render)
+
+**Frontend → [Netlify](https://www.netlify.com)** (repo root includes `netlify.toml`, base directory `frontend`)
+
+Netlify environment variables:
+
+| Variable | Example |
+| -------- | ------- |
+| `NEXT_PUBLIC_API_URL` | `https://your-api.onrender.com/api` |
+| `NEXT_PUBLIC_POST_FALLBACK_IMAGE` | `/static/post-fallback.png` |
+| `NEXT_PUBLIC_POST_LOCAL_FALLBACK_IMAGE` | `/images/post-fallback.png` |
+
+**Backend → [Render](https://render.com)** (or similar)
+
+| Variable | Example |
+| -------- | ------- |
+| `DATABASE_URL` | Neon connection string |
+| `NODE_ENV` | `production` |
+| `PORT` | Set by Render (used automatically) |
+| `CORS_ORIGIN` | `https://your-app.netlify.app` |
+| `COOKIE_SECURE` | `true` |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Long random strings |
+
+When `COOKIE_SECURE=true`, auth cookies use `SameSite=None` so login works across Netlify and Render. For multiple Netlify URLs (prod + previews), use comma-separated `CORS_ORIGIN`.
+
+After deploy, run migrations once against production Postgres:
+
+```bash
+cd backend && npm run migration:run
+```

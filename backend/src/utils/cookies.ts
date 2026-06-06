@@ -3,12 +3,23 @@ import { CookieOptions, Response } from "express";
 export const ACCESS_TOKEN_COOKIE = "access_token";
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 
+function getSameSite(secure: boolean): CookieOptions["sameSite"] {
+  const explicit = process.env.COOKIE_SAME_SITE;
+
+  if (explicit === "none" || explicit === "lax" || explicit === "strict") {
+    return explicit;
+  }
+
+  // Cross-origin production (e.g. Netlify UI + Render API) requires SameSite=None.
+  return secure ? "none" : "lax";
+}
+
 function baseCookieOptions(): CookieOptions {
   const secure = process.env.COOKIE_SECURE === "true";
   return {
     httpOnly: true,
     secure,
-    sameSite: secure ? "strict" : "lax",
+    sameSite: getSameSite(secure),
     path: "/",
   };
 }
