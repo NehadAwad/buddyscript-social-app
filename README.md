@@ -73,6 +73,20 @@ cd frontend && npm run dev
 
 Tokens are stored in HTTP-only cookies. Send `credentials: 'include'` from the frontend.
 
+### Comments & Likes API
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/api/posts/:id/comments` | List comments (oldest first, nested replies) |
+| POST | `/api/posts/:id/comments` | Add comment or reply (`parentId` optional) |
+| GET | `/api/comments/:id/replies` | Paginated replies |
+| DELETE | `/api/comments/:id` | Delete own comment |
+| POST | `/api/likes` | Like post or comment |
+| DELETE | `/api/likes?targetId=&targetType=` | Unlike |
+| GET | `/api/likes/:targetId/users?type=` | Who liked (paginated) |
+
+**Test Phase 9:** `cd backend && npm run test:phase9`
+
 ### Port already in use?
 
 Change `BACKEND_PORT` in `.env` (e.g. `4001`) and update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match.

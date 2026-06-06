@@ -1,6 +1,10 @@
 export { LoginForm } from "./auth/LoginForm";
 export { RegisterForm } from "./auth/RegisterForm";
 export { FeedLayout } from "./feed/FeedLayout";
+export { CommentInput } from "./feed/CommentInput";
+export { CommentItem } from "./feed/CommentItem";
+export { CommentThread } from "./feed/CommentThread";
+export { LikersModal } from "./feed/LikersModal";
 export { FeedMiddleColumn } from "./feed/FeedMiddleColumn";
 export { FeedShellStatic } from "./feed/FeedShellStatic";
 export { FeedSidebarLeft } from "./feed/FeedSidebarLeft";

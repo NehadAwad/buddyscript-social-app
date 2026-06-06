@@ -15,3 +15,11 @@ export const postRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many requests, please try again later" },
 });
+
+export const likeRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later" },
+});

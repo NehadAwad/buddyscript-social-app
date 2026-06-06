@@ -4,6 +4,7 @@ export { AuthOrDivider } from "./auth/AuthOrDivider";
 export { AuthSubmitButton } from "./auth/AuthSubmitButton";
 export { GoogleAuthButton } from "./auth/GoogleAuthButton";
 export { FeedStatusCard } from "./feed/FeedStatusCard";
+export { LikeButton } from "./feed/LikeButton";
 export { PhotoAttachButton } from "./feed/PhotoAttachButton";
 export { PostAuthorHeader } from "./feed/PostAuthorHeader";
 export { PostCommentPlaceholder } from "./feed/PostCommentPlaceholder";

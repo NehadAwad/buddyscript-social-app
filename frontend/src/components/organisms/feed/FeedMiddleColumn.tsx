@@ -19,7 +19,7 @@ export function FeedMiddleColumn({ user }: FeedMiddleColumnProps) {
         <div className="_layout_middle_inner">
           <FeedStoriesStatic />
           <PostComposer user={user} onPostCreated={() => setRefreshToken((n) => n + 1)} />
-          <PostList currentUserId={user.id} refreshToken={refreshToken} />
+          <PostList currentUser={user} refreshToken={refreshToken} />
         </div>
       </div>
     </div>

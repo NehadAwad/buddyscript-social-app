@@ -14,6 +14,11 @@ import {
   listPostsQuerySchema,
   postIdParamSchema,
 } from "../validators/post.validator";
+import {
+  createCommentSchema,
+  listCommentsQuerySchema,
+} from "../validators/comment.validator";
+import { commentController } from "../controllers/comment.controller";
 
 const router = Router();
 
@@ -39,6 +44,20 @@ router.post(
 );
 
 router.get("/", validateQuery(listPostsQuerySchema), postController.list.bind(postController));
+
+router.get(
+  "/:id/comments",
+  validateParams(postIdParamSchema),
+  validateQuery(listCommentsQuerySchema),
+  commentController.listForPost.bind(commentController)
+);
+
+router.post(
+  "/:id/comments",
+  validateParams(postIdParamSchema),
+  validateBody(createCommentSchema),
+  commentController.createOnPost.bind(commentController)
+);
 
 router.get(
   "/:id",

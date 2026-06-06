@@ -12,7 +12,8 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
-    "test:image-fallback": "tsx scripts/test-image-fallback.ts"
+    "test:image-fallback": "tsx scripts/test-image-fallback.ts",
+    "test:phase9": "tsx scripts/test-phase9.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

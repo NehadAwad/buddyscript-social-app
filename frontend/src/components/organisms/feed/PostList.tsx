@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { listPosts } from "@/lib/posts";
+import type { PublicUser } from "@/types/auth";
 import type { FeedPost } from "@/types/post";
 import { FeedStatusCard } from "@/components/molecules";
 import { PostCard } from "./PostCard";
 
 interface PostListProps {
-  currentUserId: string;
+  currentUser: PublicUser;
   refreshToken: number;
 }
 
-export function PostList({ currentUserId, refreshToken }: PostListProps) {
+export function PostList({ currentUser, refreshToken }: PostListProps) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function PostList({ currentUserId, refreshToken }: PostListProps) {
         <PostCard
           key={post.id}
           post={post}
-          currentUserId={currentUserId}
+          currentUser={currentUser}
           onDeleted={loadPosts}
         />
       ))}
