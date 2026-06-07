@@ -4,11 +4,13 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { corsOptions } from "./config/cors";
+import { configureHelmet } from "./config/helmet";
 import {
   AppDataSource,
   checkDatabaseConnection,
   initializeDatabase,
 } from "./config/database";
+import { csrfProtection } from "./middleware/csrf.middleware";
 import { errorHandler } from "./middleware/errorHandler";
 import apiRoutes from "./routes";
 import {
@@ -23,6 +25,7 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
+app.use(configureHelmet());
 app.use(cors(corsOptions()));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -41,6 +44,7 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
+app.use("/api", csrfProtection);
 app.use("/api", apiRoutes);
 
 app.use((_req, res) => {

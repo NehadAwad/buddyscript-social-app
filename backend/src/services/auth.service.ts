@@ -10,6 +10,11 @@ import {
 import { hashPassword, verifyPassword } from "../utils/password";
 import { generateRefreshToken, hashToken } from "../utils/tokens";
 import { toPublicUser } from "../utils/userMapper";
+import {
+  assertLoginAllowed,
+  clearLoginAttempts,
+  recordFailedLogin,
+} from "../utils/loginLockout";
 import { LoginInput, RegisterInput } from "../validators/auth.validator";
 
 export interface AuthResult {
@@ -46,17 +51,22 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const email = input.email.toLowerCase();
+    assertLoginAllowed(email);
+
     const user = await this.userRepository.findOne({ where: { email } });
 
     if (!user) {
+      recordFailedLogin(email);
       throw new AppError(401, "Invalid email or password");
     }
 
     const valid = await verifyPassword(input.password, user.passwordHash);
     if (!valid) {
+      recordFailedLogin(email);
       throw new AppError(401, "Invalid email or password");
     }
 
+    clearLoginAttempts(email);
     return this.issueAuthTokens(user);
   }
 

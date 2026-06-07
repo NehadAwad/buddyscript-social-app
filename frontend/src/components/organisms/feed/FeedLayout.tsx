@@ -9,6 +9,40 @@ import { FeedSidebarLeft } from "./FeedSidebarLeft";
 import { FeedSidebarRight } from "./FeedSidebarRight";
 import { FeedMiddleColumn } from "./FeedMiddleColumn";
 
+function ColdStartMessage() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "60vh",
+        textAlign: "center",
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: 48,
+          height: 48,
+          border: "4px solid #e0e0e0",
+          borderTopColor: "#1890ff",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite",
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <h4 style={{ marginTop: 24, fontSize: 18, fontWeight: 600, color: "#333" }}>
+        Waking up the server...
+      </h4>
+      <p style={{ marginTop: 8, fontSize: 14, color: "#666", maxWidth: 300 }}>
+        This may take 10-30 seconds on the first visit. The server sleeps when inactive to save resources.
+      </p>
+    </div>
+  );
+}
+
 function bindDropdownToggle(buttonSelector: string, menuSelector: string) {
   const button = document.querySelector<HTMLElement>(buttonSelector);
   const menu = document.querySelector<HTMLElement>(menuSelector);
@@ -50,11 +84,25 @@ export function FeedLayout() {
   const router = useRouter();
   const [user, setUser] = useState<PublicUser | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [showColdStart, setShowColdStart] = useState(false);
 
   useEffect(() => {
+    const coldStartTimer = setTimeout(() => {
+      setShowColdStart(true);
+    }, 3000);
+
     getCurrentUser()
-      .then(setUser)
-      .catch(() => router.replace("/login"));
+      .then((fetchedUser) => {
+        clearTimeout(coldStartTimer);
+        setShowColdStart(false);
+        setUser(fetchedUser);
+      })
+      .catch(() => {
+        clearTimeout(coldStartTimer);
+        router.replace("/login");
+      });
+
+    return () => clearTimeout(coldStartTimer);
   }, [router]);
 
   useEffect(() => {
@@ -102,6 +150,9 @@ export function FeedLayout() {
   }, [user, router]);
 
   if (!user) {
+    if (showColdStart) {
+      return <ColdStartMessage />;
+    }
     return null;
   }
 

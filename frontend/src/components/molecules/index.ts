@@ -6,6 +6,7 @@ export { GoogleAuthButton } from "./auth/GoogleAuthButton";
 export { FeedStatusCard } from "./feed/FeedStatusCard";
 export { LikeButton } from "./feed/LikeButton";
 export { PhotoAttachButton } from "./feed/PhotoAttachButton";
+export { PostCardSkeleton } from "./feed/PostCardSkeleton";
 export { PostAuthorHeader } from "./feed/PostAuthorHeader";
 export { PostCommentPlaceholder } from "./feed/PostCommentPlaceholder";
 export { PostImage } from "./feed/PostImage";

@@ -25,6 +25,7 @@ export function PostImage({
       src={src}
       alt={alt}
       className={className}
+      loading="lazy"
       onError={(event) => handlePostImageError(event.currentTarget)}
     />
   );

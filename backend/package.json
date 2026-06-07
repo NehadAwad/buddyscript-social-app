@@ -12,8 +12,7 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
-    "test:image-fallback": "tsx scripts/test-image-fallback.ts",
-    "test:phase9": "tsx scripts/test-phase9.ts"
+    "test:image-fallback": "tsx scripts/test-image-fallback.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -22,6 +21,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "pg": "^8.13.1",

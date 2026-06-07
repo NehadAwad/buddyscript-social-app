@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { postController } from "../controllers/post.controller";
 import { authenticate } from "../middleware/auth.middleware";
-import { postRateLimiter } from "../middleware/rateLimiter";
+import { postRateLimiter, commentRateLimiter } from "../middleware/rateLimiter";
 import { optionalPostImageUpload } from "../middleware/upload.middleware";
 import {
   validateBody,
@@ -54,6 +54,7 @@ router.get(
 
 router.post(
   "/:id/comments",
+  commentRateLimiter,
   validateParams(postIdParamSchema),
   validateBody(createCommentSchema),
   commentController.createOnPost.bind(commentController)

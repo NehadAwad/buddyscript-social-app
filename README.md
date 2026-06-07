@@ -85,8 +85,6 @@ Tokens are stored in HTTP-only cookies. Send `credentials: 'include'` from the f
 | DELETE | `/api/likes?targetId=&targetType=` | Unlike |
 | GET | `/api/likes/:targetId/users?type=` | Who liked (paginated) |
 
-**Test Phase 9:** `cd backend && npm run test:phase9`
-
 ### Port already in use?
 
 Change `BACKEND_PORT` in `.env` (e.g. `4001`) and update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match.

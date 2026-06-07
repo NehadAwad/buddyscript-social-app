@@ -13,6 +13,6 @@ export function Avatar({
 }: AvatarProps) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src || fallback} alt={alt} className={className} />
+    <img src={src || fallback} alt={alt} className={className} loading="lazy" />
   );
 }
