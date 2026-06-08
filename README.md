@@ -2,11 +2,16 @@
 
 A full-stack social feed application with JWT authentication, threaded discussions, and a responsive UI built from a custom design system.
 
-**Live:** [API](https://buddyscript-social-app.onrender.com/api/health) · App on Vercel _(coming soon)_
+| | |
+|---|---|
+| **App** | [buddyscript-social-app.vercel.app](https://buddyscript-social-app.vercel.app/) |
+| **API** | [buddyscript-social-app.onrender.com](https://buddyscript-social-app.onrender.com/api/health) |
 
 ## Overview
 
 Buddy Script is a social platform where users can publish posts, engage through likes and threaded comments, and control post visibility. The interface is built with Next.js and styled to match the original HTML/CSS design; the API is a REST backend with session management via HTTP-only cookies.
+
+For architecture decisions, trade-offs, and scaling notes, see **[DOCUMENTATION.md](./DOCUMENTATION.md)**.
 
 ## Features
 
@@ -86,11 +91,16 @@ Environment templates: `.env.example`, `frontend/.env.local.example`
 
 </details>
 
+## Documentation
+
+**[DOCUMENTATION.md](./DOCUMENTATION.md)** — What was built, design decisions, free-tier constraints, deferred improvements, and a production scaling roadmap.
+
 ## Project Structure
 
 ```
 ├── backend/          Express API, entities, migrations
 ├── frontend/         Next.js application
+├── DOCUMENTATION.md  Engineering notes and scaling considerations
 ├── Base /            Original HTML/CSS design reference
 └── docker-compose.yml
 ```
