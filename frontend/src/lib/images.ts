@@ -1,5 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-export const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+import { getApiOrigin, getApiUrl } from "./env";
+
+const API_URL = getApiUrl();
+export const API_ORIGIN = getApiOrigin();
 
 /** Backend committed asset; survives deploys (see backend/assets/static/). */
 export const POST_FALLBACK_IMAGE_PATH =

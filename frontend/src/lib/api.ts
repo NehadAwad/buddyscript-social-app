@@ -8,7 +8,9 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+import { getApiUrl } from "./env";
+
+const API_URL = getApiUrl();
 
 const NO_REFRESH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh"];
 

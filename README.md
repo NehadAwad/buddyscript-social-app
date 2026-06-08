@@ -2,7 +2,7 @@
 
 A full-stack social feed application with JWT authentication, threaded discussions, and a responsive UI built from a custom design system.
 
-**Live:** Application and API links will be added here.
+**Live:** [API](https://buddyscript-social-app.onrender.com/api/health) · App on Vercel _(coming soon)_
 
 ## Overview
 

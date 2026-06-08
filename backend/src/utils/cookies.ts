@@ -10,7 +10,7 @@ function getSameSite(secure: boolean): CookieOptions["sameSite"] {
     return explicit;
   }
 
-  // Cross-origin production (e.g. Netlify UI + Render API) requires SameSite=None.
+  // Cross-origin production (e.g. Vercel UI + Render API) requires SameSite=None.
   return secure ? "none" : "lax";
 }
 
