@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { AppProviders } from "@/components/AppProviders";
 import "@/styles/bootstrap.min.css";
 import "@/styles/common.css";
 import "@/styles/main.css";
@@ -26,7 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={poppins.className}>{children}</body>
+      <body className={poppins.className}>
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { listLikers } from "@/lib/likes";
 import type { LikeTargetType, LikerUser } from "@/types/like";
 import { Avatar } from "@/components/atoms";
+
+const LIKERS_PAGE_SIZE = 20;
 
 interface LikersModalProps {
   targetId: string;
@@ -21,36 +23,54 @@ export function LikersModal({
 }: LikersModalProps) {
   const [users, setUsers] = useState<LikerUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const loadInitial = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setUsers([]);
+    setNextCursor(null);
+
+    try {
+      const result = await listLikers(targetId, targetType, LIKERS_PAGE_SIZE);
+      setUsers(result.users);
+      setNextCursor(result.nextCursor);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load likers");
+    } finally {
+      setLoading(false);
+    }
+  }, [targetId, targetType]);
 
   useEffect(() => {
-    let active = true;
+    loadInitial();
+  }, [loadInitial]);
 
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await listLikers(targetId, targetType);
-        if (active) {
-          setUsers(result.users);
-        }
-      } catch (err) {
-        if (active) {
-          setError(err instanceof ApiError ? err.message : "Failed to load likers");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
+  async function loadMore() {
+    if (!nextCursor || loadingMore) {
+      return;
     }
 
-    load();
-    return () => {
-      active = false;
-    };
-  }, [targetId, targetType]);
+    setLoadingMore(true);
+    setError(null);
+
+    try {
+      const result = await listLikers(
+        targetId,
+        targetType,
+        LIKERS_PAGE_SIZE,
+        nextCursor
+      );
+      setUsers((current) => [...current, ...result.users]);
+      setNextCursor(result.nextCursor);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load more likers");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div
@@ -69,7 +89,10 @@ export function LikersModal({
             <h5 className="modal-title _title5">{title}</h5>
             <button type="button" className="btn-close" aria-label="Close" onClick={onClose} />
           </div>
-          <div className="modal-body _padd_l24 _padd_r24 _padd_b24">
+          <div
+            className="modal-body _padd_l24 _padd_r24 _padd_b24"
+            style={{ maxHeight: "60vh", overflowY: "auto" }}
+          >
             {loading ? <p>Loading...</p> : null}
             {error ? <p className="text-danger">{error}</p> : null}
             {!loading && !error && users.length === 0 ? (
@@ -85,6 +108,18 @@ export function LikersModal({
                 </li>
               ))}
             </ul>
+            {nextCursor ? (
+              <div className="_previous_comment">
+                <button
+                  type="button"
+                  className="_previous_comment_txt"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Loading..." : "View more"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

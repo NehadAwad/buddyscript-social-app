@@ -9,6 +9,7 @@ import {
   User,
 } from "../entities";
 import { InitialSchema1738680000000 } from "../migrations/1738680000000-InitialSchema";
+import { PerformanceIndexes1738690000000 } from "../migrations/1738690000000-PerformanceIndexes";
 
 function resolveSsl():
   | boolean
@@ -32,11 +33,15 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   ssl: resolveSsl(),
   entities: [User, Post, Comment, Like, RefreshToken],
-  migrations: [InitialSchema1738680000000],
+  migrations: [InitialSchema1738680000000, PerformanceIndexes1738690000000],
   migrationsTableName: "migrations",
   synchronize: false,
   logging: process.env.NODE_ENV === "development",
   extra: {
     max: Number(process.env.DATABASE_POOL_MAX) || 10,
+    min: Number(process.env.DATABASE_POOL_MIN) || 2,
+    idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS) || 30_000,
+    connectionTimeoutMillis:
+      Number(process.env.DATABASE_CONNECTION_TIMEOUT_MS) || 5_000,
   },
 });

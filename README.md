@@ -1,145 +1,96 @@
-# Buddy Script Social App
+# Buddy Script
 
-Full-stack social feed application (Next.js, Express, PostgreSQL, TypeORM).
+A full-stack social feed application with JWT authentication, threaded discussions, and a responsive UI built from a custom design system.
 
-## Prerequisites
+**Live:** Application and API links will be added here.
 
-- Node.js 20+
-- PostgreSQL database ([Neon](https://neon.tech) recommended)
+## Overview
 
-Docker is optional and not required for development.
+Buddy Script is a social platform where users can publish posts, engage through likes and threaded comments, and control post visibility. The interface is built with Next.js and styled to match the original HTML/CSS design; the API is a REST backend with session management via HTTP-only cookies.
 
-## Local setup
+## Features
 
-### 1. Environment
+- User registration and login with secure password handling
+- Protected feed with public and private posts
+- Post creation with text and image uploads
+- Cursor-paginated feed with infinite scroll
+- Likes on posts, comments, and replies with paginated liker lists
+- One-level comment threads with optimistic UI updates
+- Graceful image fallback when uploads are unavailable
+
+## Tech Stack
+
+| Layer | Technologies |
+|-------|----------------|
+| Frontend | Next.js 14, React 18, TypeScript |
+| Backend | Express, TypeORM, TypeScript |
+| Database | PostgreSQL |
+| Auth | JWT (access + refresh), bcrypt, HTTP-only cookies |
+
+## Engineering
+
+- **Security** — CORS allowlisting, CSRF origin validation, rate limiting, bcrypt (cost 12), Helmet headers
+- **Performance** — Cursor pagination, denormalized counts, response compression, partial DB indexes, client-side stale-while-revalidate cache
+- **Reliability** — Structured logging, health endpoint with memory metrics, error boundaries, automatic token refresh
+
+## Architecture
+
+```
+frontend/   Next.js App Router — pages, components, client API layer
+backend/    Express REST API — auth, posts, comments, likes
+```
+
+The frontend and API are deployed as separate services. Cross-origin requests use credentialed fetches; the API enforces authorization on every protected resource. Feed queries are designed for scale with cursor-based pagination and indexed visibility filters.
+
+## Local Development
+
+**Requirements:** Node.js 20+, PostgreSQL
 
 ```bash
 cp .env.example .env
 cp frontend/.env.local.example frontend/.env.local
-```
 
-Edit `.env` if your Postgres credentials differ from the defaults.
-
-### 2. Database migrations
-
-Run once against your `DATABASE_URL` (Neon or local Postgres):
-
-```bash
-cd backend
-npm install
-npm run migration:run
-```
-
-### 3. Install dependencies
-
-```bash
-cd backend && npm install
+cd backend && npm install && npm run migration:run
 cd ../frontend && npm install
+
+npm run dev:backend   # http://localhost:4000
+npm run dev:frontend  # http://localhost:3000
 ```
 
-### 4. Run the app
+Environment templates: `.env.example`, `frontend/.env.local.example`
 
-Use two terminals:
+## API Reference
 
-```bash
-# Terminal 1 — API (port 4000)
-npm run dev:backend
+<details>
+<summary>Endpoints</summary>
 
-# Terminal 2 — UI (port 3000)
-npm run dev:frontend
-```
+**Auth**
 
-Or from each folder:
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Sign in |
+| POST | `/api/auth/refresh` | Rotate tokens |
+| POST | `/api/auth/logout` | Sign out |
+| GET | `/api/auth/me` | Current user |
 
-```bash
-cd backend && npm run dev
-cd frontend && npm run dev
-```
+**Posts & social**
 
-| Service  | URL |
-| -------- | --- |
-| Frontend | http://localhost:3000 |
-| Backend  | http://localhost:4000/api/health |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET / POST | `/api/posts` | Feed (cursor) / create post |
+| DELETE | `/api/posts/:id` | Delete own post |
+| GET / POST | `/api/posts/:id/comments` | Comments / add comment or reply |
+| POST / DELETE | `/api/likes` | Like / unlike |
+| GET | `/api/likes/:targetId/users` | Paginated likers |
 
-### Auth API
+</details>
 
-| Method | Endpoint | Description |
-| ------ | -------- | ----------- |
-| POST | `/api/auth/register` | Register (`firstName`, `lastName`, `email`, `password`) |
-| POST | `/api/auth/login` | Login (`email`, `password`) |
-| POST | `/api/auth/refresh` | Rotate tokens (uses `refresh_token` cookie) |
-| POST | `/api/auth/logout` | Logout and clear cookies |
-| GET | `/api/auth/me` | Current user (requires `access_token` cookie) |
-
-Tokens are stored in HTTP-only cookies. Send `credentials: 'include'` from the frontend.
-
-### Comments & Likes API
-
-| Method | Endpoint | Description |
-| ------ | -------- | ----------- |
-| GET | `/api/posts/:id/comments` | List comments (oldest first, nested replies) |
-| POST | `/api/posts/:id/comments` | Add comment or reply (`parentId` optional) |
-| GET | `/api/comments/:id/replies` | Paginated replies |
-| DELETE | `/api/comments/:id` | Delete own comment |
-| POST | `/api/likes` | Like post or comment |
-| DELETE | `/api/likes?targetId=&targetType=` | Unlike |
-| GET | `/api/likes/:targetId/users?type=` | Who liked (paginated) |
-
-### Port already in use?
-
-Change `BACKEND_PORT` in `.env` (e.g. `4001`) and update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match.
-
-## Project structure
+## Project Structure
 
 ```
-├── backend/              # Express API
-├── frontend/             # Next.js App Router
-├── Base /                # HTML/CSS design assets
-├── .env.example          # Local env template (copy to .env)
-├── docker-compose.yml    # Optional — not needed for local dev
-└── backend/src/
-    ├── entities/         # TypeORM models
-    └── migrations/       # Schema migrations
-```
-
-## Optional: Docker
-
-Only if you want containerized Postgres or full stack in containers:
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-For Docker, set `DATABASE_HOST=postgres` and `DATABASE_URL=postgresql://...@postgres:5432/...` in `.env`.
-
-## Deploy (Netlify + Render)
-
-**Frontend → [Netlify](https://www.netlify.com)** (repo root includes `netlify.toml`, base directory `frontend`)
-
-Netlify environment variables:
-
-| Variable | Example |
-| -------- | ------- |
-| `NEXT_PUBLIC_API_URL` | `https://your-api.onrender.com/api` |
-| `NEXT_PUBLIC_POST_FALLBACK_IMAGE` | `/static/post-fallback.png` |
-| `NEXT_PUBLIC_POST_LOCAL_FALLBACK_IMAGE` | `/images/post-fallback.png` |
-
-**Backend → [Render](https://render.com)** (or similar)
-
-| Variable | Example |
-| -------- | ------- |
-| `DATABASE_URL` | Neon connection string |
-| `NODE_ENV` | `production` |
-| `PORT` | Set by Render (used automatically) |
-| `CORS_ORIGIN` | `https://your-app.netlify.app` |
-| `COOKIE_SECURE` | `true` |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Long random strings |
-
-When `COOKIE_SECURE=true`, auth cookies use `SameSite=None` so login works across Netlify and Render. For multiple Netlify URLs (prod + previews), use comma-separated `CORS_ORIGIN`.
-
-After deploy, run migrations once against production Postgres:
-
-```bash
-cd backend && npm run migration:run
+├── backend/          Express API, entities, migrations
+├── frontend/         Next.js application
+├── Base /            Original HTML/CSS design reference
+└── docker-compose.yml
 ```

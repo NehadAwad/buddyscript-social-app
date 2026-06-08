@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
+import { clearCachedFeed, getCachedFeed, setCachedFeed } from "@/lib/clientCache";
 import { listPosts } from "@/lib/posts";
 import type { PublicUser } from "@/types/auth";
 import type { FeedPost } from "@/types/post";
@@ -22,24 +23,37 @@ export function PostList({ currentUser, refreshToken }: PostListProps) {
   const loaderRef = useRef<HTMLDivElement>(null);
   const lastRefreshToken = useRef(refreshToken);
 
-  const loadPosts = useCallback(async (reset = false) => {
-    if (reset) {
-      setLoading(true);
-      setPosts([]);
-      setNextCursor(null);
-    }
-    setError(null);
+  const loadPosts = useCallback(
+    async (reset = false) => {
+      if (reset) {
+        const cached = getCachedFeed(currentUser.id);
+        if (cached) {
+          setPosts(cached.posts);
+          setNextCursor(cached.nextCursor);
+          setLoading(false);
+        } else {
+          setLoading(true);
+          setPosts([]);
+          setNextCursor(null);
+        }
+      }
+      setError(null);
 
-    try {
-      const result = await listPosts(10);
-      setPosts(result.posts);
-      setNextCursor(result.nextCursor);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load posts");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        const result = await listPosts(10);
+        setPosts(result.posts);
+        setNextCursor(result.nextCursor);
+        setCachedFeed(currentUser.id, result.posts, result.nextCursor);
+      } catch (err) {
+        if (!getCachedFeed(currentUser.id)) {
+          setError(err instanceof ApiError ? err.message : "Failed to load posts");
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentUser.id]
+  );
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) {
@@ -50,14 +64,18 @@ export function PostList({ currentUser, refreshToken }: PostListProps) {
 
     try {
       const result = await listPosts(10, nextCursor);
-      setPosts((current) => [...current, ...result.posts]);
+      setPosts((current) => {
+        const merged = [...current, ...result.posts];
+        setCachedFeed(currentUser.id, merged, result.nextCursor);
+        return merged;
+      });
       setNextCursor(result.nextCursor);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load more posts");
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore]);
+  }, [nextCursor, loadingMore, currentUser.id]);
 
   useEffect(() => {
     loadPosts(true);
@@ -66,9 +84,10 @@ export function PostList({ currentUser, refreshToken }: PostListProps) {
   useEffect(() => {
     if (refreshToken !== lastRefreshToken.current) {
       lastRefreshToken.current = refreshToken;
+      clearCachedFeed(currentUser.id);
       loadPosts(true);
     }
-  }, [refreshToken, loadPosts]);
+  }, [refreshToken, loadPosts, currentUser.id]);
 
   useEffect(() => {
     const loader = loaderRef.current;
@@ -93,10 +112,14 @@ export function PostList({ currentUser, refreshToken }: PostListProps) {
   }, [nextCursor, loadingMore, loading, loadMore]);
 
   function handlePostDeleted(deletedPostId: string) {
-    setPosts((current) => current.filter((post) => post.id !== deletedPostId));
+    setPosts((current) => {
+      const updated = current.filter((post) => post.id !== deletedPostId);
+      setCachedFeed(currentUser.id, updated, nextCursor);
+      return updated;
+    });
   }
 
-  if (loading) {
+  if (loading && posts.length === 0) {
     return (
       <>
         <PostCardSkeleton />

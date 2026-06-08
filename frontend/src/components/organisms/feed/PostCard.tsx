@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import type { PublicUser } from "@/types/auth";
@@ -12,8 +13,12 @@ import {
 } from "@/components/molecules";
 import { CommentInput } from "./CommentInput";
 import { CommentThread } from "./CommentThread";
-import { LikersModal } from "./LikersModal";
 import { PostMenu } from "./PostMenu";
+
+const LikersModal = dynamic(
+  () => import("./LikersModal").then((mod) => ({ default: mod.LikersModal })),
+  { ssr: false }
+);
 
 interface PostCardProps {
   post: FeedPost;

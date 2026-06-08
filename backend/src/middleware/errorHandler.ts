@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import { AppError } from "../utils/AppError";
+import { logError } from "../utils/logger";
 
 export function errorHandler(
   error: unknown,
@@ -23,9 +24,13 @@ export function errorHandler(
     return;
   }
 
-  if (process.env.NODE_ENV === "development") {
-    console.error(error);
-  }
+  const message = error instanceof Error ? error.message : String(error);
+  logError("unhandled_error", {
+    message,
+    ...(error instanceof Error && process.env.NODE_ENV === "development"
+      ? { stack: error.stack }
+      : {}),
+  });
 
   res.status(500).json({ message: "Internal server error" });
 }

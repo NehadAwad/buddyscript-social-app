@@ -1,11 +1,9 @@
-import { ApiError } from "./api";
+import { ApiError, fetchWithAuth } from "./api";
 import type {
   CreatePostResponse,
   FeedPostsResponse,
   FeedPost,
 } from "@/types/post";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 export interface CreatePostInput {
   content?: string;
@@ -13,50 +11,9 @@ export interface CreatePostInput {
   image?: File | null;
 }
 
-export async function createPost(input: CreatePostInput): Promise<FeedPost> {
-  if (input.image) {
-    const formData = new FormData();
-    if (input.content?.trim()) {
-      formData.append("content", input.content.trim());
-    }
-    formData.append("visibility", input.visibility ?? "public");
-    formData.append("image", input.image);
-
-    const response = await fetch(`${API_URL}/posts`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
-
-    const data = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      post?: FeedPost;
-    };
-
-    if (!response.ok) {
-      throw new ApiError(response.status, data.message ?? "Failed to create post");
-    }
-
-    if (!data.post) {
-      throw new ApiError(500, "Invalid create post response");
-    }
-
-    return data.post;
-  }
-
-  const response = await fetch(`${API_URL}/posts`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      content: input.content?.trim(),
-      visibility: input.visibility ?? "public",
-    }),
-  });
-
-  const data = (await response.json().catch(() => ({}))) as {
+async function parsePostResponse(response: Response): Promise<FeedPost> {
+  const data = (await response.json().catch(() => ({}))) as CreatePostResponse & {
     message?: string;
-    post?: FeedPost;
   };
 
   if (!response.ok) {
@@ -70,6 +27,34 @@ export async function createPost(input: CreatePostInput): Promise<FeedPost> {
   return data.post;
 }
 
+export async function createPost(input: CreatePostInput): Promise<FeedPost> {
+  if (input.image) {
+    const formData = new FormData();
+    if (input.content?.trim()) {
+      formData.append("content", input.content.trim());
+    }
+    formData.append("visibility", input.visibility ?? "public");
+    formData.append("image", input.image);
+
+    const response = await fetchWithAuth("/posts", {
+      method: "POST",
+      body: formData,
+    });
+
+    return parsePostResponse(response);
+  }
+
+  const response = await fetchWithAuth("/posts", {
+    method: "POST",
+    body: JSON.stringify({
+      content: input.content?.trim(),
+      visibility: input.visibility ?? "public",
+    }),
+  });
+
+  return parsePostResponse(response);
+}
+
 export async function listPosts(
   limit = 10,
   cursor?: string
@@ -79,9 +64,7 @@ export async function listPosts(
     params.set("cursor", cursor);
   }
 
-  const response = await fetch(`${API_URL}/posts?${params.toString()}`, {
-    credentials: "include",
-  });
+  const response = await fetchWithAuth(`/posts?${params.toString()}`);
 
   const data = (await response.json().catch(() => ({}))) as FeedPostsResponse & {
     message?: string;
@@ -95,9 +78,8 @@ export async function listPosts(
 }
 
 export async function deletePost(postId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/posts/${postId}`, {
+  const response = await fetchWithAuth(`/posts/${postId}`, {
     method: "DELETE",
-    credentials: "include",
   });
 
   const data = (await response.json().catch(() => ({}))) as { message?: string };

@@ -5,6 +5,7 @@ import { Post } from "../entities/Post";
 import { LikeTargetType } from "../entities/enums";
 import { commentService } from "./comment.service";
 import { postService } from "./post.service";
+import { invalidateFeedCaches } from "../utils/cache";
 import { AppError } from "../utils/AppError";
 import { decodeFeedCursor, encodeFeedCursor } from "../utils/cursor";
 import {
@@ -46,6 +47,7 @@ export class LikeService {
 
       if (targetType === LikeTargetType.POST) {
         await manager.getRepository(Post).increment({ id: targetId }, "likeCount", 1);
+        invalidateFeedCaches();
       } else {
         await manager
           .getRepository(Comment)
@@ -84,6 +86,7 @@ export class LikeService {
         if (post && post.likeCount > 0) {
           await postRepo.decrement({ id: targetId }, "likeCount", 1);
         }
+        invalidateFeedCaches();
       } else {
         const commentRepo = manager.getRepository(Comment);
         const comment = await commentRepo.findOne({

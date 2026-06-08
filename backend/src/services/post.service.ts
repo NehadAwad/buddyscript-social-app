@@ -4,8 +4,16 @@ import { Like } from "../entities/Like";
 import { Post } from "../entities/Post";
 import { LikeTargetType, PostVisibility } from "../entities/enums";
 import { AppError } from "../utils/AppError";
+import {
+  cacheGet,
+  cacheSet,
+  feedCacheKey,
+  invalidateFeedCaches,
+} from "../utils/cache";
 import { decodeFeedCursor, encodeFeedCursor } from "../utils/cursor";
 import { FeedPostDto, toFeedPost } from "../utils/postMapper";
+
+const FEED_CACHE_TTL_SECONDS = 60;
 
 export interface CreatePostData {
   authorId: string;
@@ -48,10 +56,17 @@ export class PostService {
       throw new AppError(500, "Failed to create post");
     }
 
+    invalidateFeedCaches();
     return toFeedPost(saved, false);
   }
 
   async listFeed(userId: string, limit: number, cursor?: string): Promise<FeedResult> {
+    if (!cursor) {
+      const cached = cacheGet<FeedResult>(feedCacheKey(userId, limit));
+      if (cached) {
+        return cached;
+      }
+    }
     const query = this.postRepository
       .createQueryBuilder("post")
       .innerJoinAndSelect("post.author", "author")
@@ -97,7 +112,13 @@ export class PostService {
           })
         : null;
 
-    return { posts, nextCursor };
+    const result = { posts, nextCursor };
+
+    if (!cursor) {
+      cacheSet(feedCacheKey(userId, limit), result, FEED_CACHE_TTL_SECONDS);
+    }
+
+    return result;
   }
 
   async getById(postId: string, userId: string): Promise<FeedPostDto> {
@@ -122,6 +143,7 @@ export class PostService {
     }
 
     await this.postRepository.delete({ id: postId });
+    invalidateFeedCaches();
   }
 
   async getPostIfViewable(postId: string, userId: string): Promise<Post | null> {

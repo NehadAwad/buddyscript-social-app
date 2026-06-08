@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import "./config/env";
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import { corsOptions } from "./config/cors";
@@ -12,6 +13,8 @@ import {
 } from "./config/database";
 import { csrfProtection } from "./middleware/csrf.middleware";
 import { errorHandler } from "./middleware/errorHandler";
+import { requestLogger } from "./middleware/requestLogger.middleware";
+import { formatMemoryMb, logError, logInfo } from "./utils/logger";
 import apiRoutes from "./routes";
 import {
   serveUploadWithFallback,
@@ -26,20 +29,46 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.use(configureHelmet());
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(cors(corsOptions()));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use("/static", express.static(staticAssetsDir));
+app.use(requestLogger);
+app.use(
+  "/static",
+  express.static(staticAssetsDir, {
+    maxAge: "365d",
+    immutable: true,
+  })
+);
 app.get("/uploads/:filename", serveUploadWithFallback);
 
 app.get("/api/health", async (_req, res) => {
   const databaseConnected = await checkDatabaseConnection();
+  const memory = process.memoryUsage();
 
   res.status(databaseConnected ? 200 : 503).json({
     status: databaseConnected ? "ok" : "degraded",
     service: "appifylab-backend",
     database: databaseConnected ? "connected" : "disconnected",
+    uptimeSeconds: Math.round(process.uptime()),
+    memory: {
+      rssMb: formatMemoryMb(memory.rss),
+      heapUsedMb: formatMemoryMb(memory.heapUsed),
+      heapTotalMb: formatMemoryMb(memory.heapTotal),
+      externalMb: formatMemoryMb(memory.external),
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -56,14 +85,16 @@ app.use(errorHandler);
 async function bootstrap(): Promise<void> {
   try {
     await initializeDatabase();
-    console.log("Database connected");
+    logInfo("database_connected");
   } catch (error) {
-    console.error("Database connection failed:", error);
+    logError("database_connection_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   }
 
   app.listen(port, () => {
-    console.log(`Backend listening on port ${port}`);
+    logInfo("server_started", { port });
   });
 }
 

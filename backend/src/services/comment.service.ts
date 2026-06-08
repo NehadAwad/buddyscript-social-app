@@ -5,6 +5,7 @@ import { Like } from "../entities/Like";
 import { Post } from "../entities/Post";
 import { LikeTargetType } from "../entities/enums";
 import { postService } from "./post.service";
+import { invalidateFeedCaches } from "../utils/cache";
 import { AppError } from "../utils/AppError";
 import { CommentDto, toCommentDto } from "../utils/commentMapper";
 import { decodeFeedCursor, encodeFeedCursor } from "../utils/cursor";
@@ -81,6 +82,10 @@ export class CommentService {
 
       return withAuthor;
     });
+
+    if (!data.parentId) {
+      invalidateFeedCaches();
+    }
 
     return toCommentDto(saved, false);
   }
@@ -236,6 +241,10 @@ export class CommentService {
 
       await commentRepo.delete({ id: commentId });
     });
+
+    if (!comment.parentId) {
+      invalidateFeedCaches();
+    }
   }
 
   async getCommentWithViewCheck(
