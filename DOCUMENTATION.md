@@ -22,7 +22,7 @@ The application is a full-stack social feed: users authenticate, publish posts (
                                                                │
                      ┌─────────────────────────────────────────┼──────────────┐
                      │                                         ▼              │
-                     │  In-process state (lost on restart / not shared):      │
+                     │  In-process state (not shared):      │
                      │  • feed cache (Map, TTL 60s)                           │
                      │  • rate limits (express-rate-limit, in-memory)         │
                      │  • login lockout counters (Map)                        │
