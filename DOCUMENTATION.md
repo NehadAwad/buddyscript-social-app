@@ -1,292 +1,166 @@
 # Buddy Script — Engineering Documentation
 
-## 1. Purpose
+## Overview
 
-This document describes what was built, the architectural decisions behind it, and what would change in a production environment without free-tier hosting constraints.
-
-The application is a full-stack social feed: users authenticate, publish posts (text/image), like content, and participate in one-level comment threads. The UI was implemented from provided HTML/CSS using Next.js; the backend is a REST API with PostgreSQL.
+A full-stack social feed application where users authenticate, publish posts (text/images), like content, and participate in threaded comments. Built from provided HTML/CSS designs using Next.js for the frontend and Express/TypeORM for the REST API.
 
 **Live**
 - App: https://buddyscript-social-app.vercel.app/
 - API: https://buddyscript-social-app.onrender.com/api/health
 
----
-
-## 2. Current Architecture
-
-```
-┌─────────────┐         credentialed fetch          ┌─────────────────────┐
-│   Vercel    │ ──────────────────────────────────▶ │  Render (1 instance) │
-│  Next.js 14 │         HTTP-only cookies           │  Express + TypeORM   │
-└─────────────┘                                     └──────────┬──────────┘
-                                                               │
-                     ┌─────────────────────────────────────────┼──────────────┐
-                     │                                         ▼              │
-                     │  In-process state (not shared):      │
-                     │  • feed cache (Map, TTL 60s)                           │
-                     │  • rate limits (express-rate-limit, in-memory)         │
-                     │  • login lockout counters (Map)                        │
-                     │                                                         │
-                     │  Ephemeral disk:                                        │
-                     │  • uploads/ (multer → local filesystem)                │
-                     └─────────────────────────────────────────────────────────┘
-                                                               │
-                                                               ▼
-                                                    ┌─────────────────────┐
-                                                    │  Neon PostgreSQL     │
-                                                    │  (pooled connection) │
-                                                    └─────────────────────┘
-```
-
-**Deployment model:** Decoupled frontend (Vercel) and API (Render). Auth crosses origins via `SameSite=None; Secure` cookies. The API is a single stateful process — a deliberate simplification for zero-cost hosting.
+**Stack:** Next.js 14 (Vercel) · Express + TypeORM (Render) · PostgreSQL (Neon)
 
 ---
 
-## 3. What Was Built
+## What Was Built
 
-### Functional scope
+### Features
+- **Auth** — Register, login, logout, refresh tokens; bcrypt hashing; JWT in HTTP-only cookies with rotation
+- **Feed** — Cursor-based pagination, infinite scroll, public/private visibility
+- **Posts** — Text and image uploads; author-only delete
+- **Social** — Likes on posts/comments, paginated liker lists, one-level comment threads
+- **UX** — Optimistic like updates, client-side feed cache, image fallback, error boundaries, auto token refresh
 
-| Area | Implementation |
-|------|----------------|
-| Auth | Register, login, logout, refresh, `/me`; bcrypt (cost 12); JWT access + refresh; refresh tokens hashed and stored in Postgres with rotation on use |
-| Feed | Cursor-based pagination, infinite scroll, public/private visibility rules |
-| Posts | Text and optional image upload; author-only delete |
-| Social | Likes on posts/comments; paginated liker lists; one-level comment threads |
-| Frontend UX | Optimistic like updates, sessionStorage feed cache, image fallback, error boundaries, automatic token refresh on 401 |
-
-### Non-functional scope (implemented)
-
-| Concern | Approach |
-|---------|----------|
-| Security | CORS allowlist, CSRF `Origin` validation, Helmet, route-level auth, login lockout (5 failures → 15 min) |
-| Data integrity | DB transactions for likes and comment count updates; denormalized `likeCount` / `commentCount` kept in sync inside transactions |
-| Performance | Cursor pagination, partial index on public feed, gzip compression, 60s server feed cache, client stale cache |
-| Operability | Structured JSON request/error logs, `/api/health` with uptime and memory stats |
-| Schema evolution | TypeORM migrations (no `synchronize` in production) |
+### Security & Performance
+- CORS allowlist, CSRF origin validation, Helmet headers, rate limiting, login lockout (5 failures → 15 min)
+- DB transactions for count updates, denormalized `likeCount`/`commentCount`
+- Cursor pagination, partial index on public feed, gzip compression, 60s server cache
+- Structured JSON logging, `/api/health` with uptime and memory stats
+- TypeORM migrations (no `synchronize` in production)
 
 ---
 
-## 4. Design Decisions & Trade-offs
+## Design Decisions
 
-Each decision below includes what was gained and what was consciously deferred.
-
-### 4.1 Cursor pagination (feed, comments, likers)
-
-**Choice:** Keyset/cursor pagination using `(createdAt, id)` instead of `OFFSET/LIMIT`.
-
-**Why:** Offset pagination degrades as tables grow and produces inconsistent pages when rows are inserted during scrolling.
-
-**Trade-off:** Cursors are harder to jump to arbitrary pages; acceptable for an infinite-scroll feed.
-
----
-
-### 4.2 Denormalized counts
-
-**Choice:** `likeCount` and `commentCount` stored on `Post` / `Comment`, updated inside transactions when likes or comments change.
-
-**Why:** Avoids `COUNT(*)` subqueries on every feed request.
-
-**Trade-off:** Counts can drift if a write fails mid-transaction or if data is modified outside the service layer. At scale, periodic reconciliation jobs or triggers would be added.
+| Decision | Rationale | Trade-off |
+|----------|-----------|-----------|
+| **Cursor pagination** | Offset degrades at scale and causes page drift on inserts | Cannot jump to arbitrary pages |
+| **Denormalized counts** | Avoids `COUNT(*)` on every feed request | Counts can drift; needs reconciliation jobs at scale |
+| **HTTP-only cookies** | Tokens not accessible to JS, reducing XSS risk | Cross-origin requires `SameSite=None` and strict CORS |
+| **Refresh token rotation** | Limits stolen token reuse; server-side invalidation | Extra DB write per refresh |
+| **In-memory cache/rate limits** | Zero extra services for single-instance demo | Not safe for horizontal scaling |
+| **Local file uploads** | No S3/CDN setup needed | Ephemeral on Render; lost on redeploy |
+| **Monolithic API** | Lowest operational overhead | Cannot scale read/write paths independently |
 
 ---
 
-### 4.3 JWT in HTTP-only cookies (not localStorage)
+## Free-Tier Constraints
 
-**Choice:** Access token (short-lived) and refresh token (long-lived) in `httpOnly` cookies; frontend uses `credentials: "include"`.
+| Constraint | Impact |
+|------------|--------|
+| Render free tier sleeps | Cold starts; external health checks needed |
+| Single instance | All state in-process instead of Redis |
+| No Redis | No distributed cache, queue, or shared rate limits |
+| Neon free Postgres | Pool max 10 connections |
+| Cross-origin (Vercel ↔ Render) | `SameSite=None`, strict CORS, CSRF origin check |
+| No S3/CDN/Sentry budget | Uploads on disk, logs to stdout, no APM |
 
-**Why:** Tokens are not readable by client-side JavaScript, reducing XSS blast radius.
-
-**Trade-off:** Cross-origin deployment requires `SameSite=None`, correct `CORS_ORIGIN`, and `trust proxy` on the API. Cookie-based auth is also less natural for native/mobile clients without a BFF.
-
----
-
-### 4.4 Refresh token rotation with DB persistence
-
-**Choice:** Refresh tokens are hashed (SHA-256) and stored in `refresh_tokens`; each refresh deletes the old row and issues a new pair.
-
-**Why:** Stolen refresh tokens have a limited reuse window; logout can invalidate server-side state.
-
-**Trade-off:** Extra DB writes per refresh. No cleanup cron for expired rows yet (see §6).
+These are explicit trade-offs, not oversights. The codebase has clear swap points for externalizing cache, uploads, and queues.
 
 ---
 
-### 4.5 In-process cache and rate limiting
+## Improvements with Paid Infrastructure
 
-**Choice:** `Map`-based feed cache (max 500 entries, 60s TTL), `express-rate-limit` defaults, in-memory login lockout.
+Without free-tier constraints, the following upgrades would significantly improve reliability, performance, and scalability:
 
-**Why:** Zero additional services or cost; sufficient for a single instance and demo traffic.
+### 1. Persistent Object Storage (S3 / Cloudflare R2)
+**Current:** Uploads stored on Render's ephemeral filesystem — lost on every redeploy.
 
-**Trade-off:** **Not safe for horizontal scaling.** Cache is per-process, rate limits reset per instance, and lockout state is lost on deploy/restart. This is the largest architectural limitation of the current deployment.
+**With paid hosting:** Store images in S3 or R2 with CDN (CloudFront/Cloudflare). Benefits:
+- Uploads survive deployments permanently
+- Global CDN reduces latency for image delivery
+- Offloads bandwidth from the API server
+- Enables image optimization pipeline (resize, compress, WebP conversion)
 
----
+### 2. Redis for Distributed State
+**Current:** Cache, rate limits, and login lockout use in-memory `Map` — not shared across instances, lost on restart.
 
-### 4.6 Local filesystem uploads
+**With paid hosting:** Redis (AWS ElastiCache, Upstash, or Redis Cloud). Benefits:
+- **Horizontal scaling** — multiple API instances share the same cache and rate limit counters
+- **Persistent rate limiting** — brute-force protection survives deploys
+- **Session store** — instant token invalidation on logout (currently relies on DB)
+- **Pub/sub** — cache invalidation across instances when posts are created
 
-**Choice:** Multer writes to `uploads/` on the API server; static fallback images in `assets/`.
+### 3. Always-On Instances with Load Balancing
+**Current:** Single Render instance sleeps after 15 min inactivity → cold starts.
 
-**Why:** No object storage account or CDN setup required.
+**With paid hosting:** 2+ instances behind a load balancer (AWS ALB, Cloudflare). Benefits:
+- Zero cold start latency
+- High availability — one instance can fail without downtime
+- Auto-scaling based on traffic
 
-**Trade-off:** **Render’s filesystem is ephemeral.** Uploads are lost on redeploy unless persisted externally. Production must move to S3/R2 + CDN immediately.
+### 4. Background Job Processing
+**Current:** All work is synchronous in the request cycle.
 
----
+**With paid hosting:** BullMQ + Redis for async tasks. Benefits:
+- Image resizing/optimization after upload (faster response to user)
+- Email notifications (welcome, mentions, digests)
+- Scheduled cleanup of expired refresh tokens
+- Periodic reconciliation of denormalized counts
 
-### 4.7 Monolithic Express API
+### 5. Database Scaling
+**Current:** Single Neon Postgres with 10-connection pool.
 
-**Choice:** Single deployable service handling auth, posts, comments, likes, and static file serving.
+**With paid hosting:**
+- **Read replicas** — route feed queries to replica, writes to primary
+- **Connection pooling** (PgBouncer) — handle more concurrent users
+- **Larger pool size** — tune per instance count
 
-**Why:** Lowest operational overhead for a portfolio/assignment deliverable.
+### 6. Real-Time Features
+**Current:** Client refetches data after actions; no live updates.
 
-**Trade-off:** Cannot scale read-heavy and write-heavy paths independently. Extraction into auth service, media service, or notification service would come later.
+**With paid hosting:** WebSockets (Socket.IO) or Server-Sent Events. Benefits:
+- Instant like/comment notifications
+- Live feed updates without refresh
+- Online presence indicators
 
----
+### 7. Observability & Reliability
+**Current:** Structured logs to stdout, basic health endpoint, frontend error boundaries.
 
-## 5. Free-Tier Constraints That Shaped the Design
+**With paid hosting:**
+- **Sentry** — error tracking with stack traces and source maps
+- **Datadog/New Relic** — APM with distributed tracing across DB and HTTP
+- **Alerting** — PagerDuty on error spikes, latency p99, memory exhaustion
+- **Centralized logging** — searchable logs with retention
 
-| Constraint | Impact on architecture |
-|------------|------------------------|
-| Render free web service sleeps after inactivity | Cold starts; health endpoint used for external uptime checks |
-| Single Render instance | All ephemeral state kept in-process instead of Redis |
-| No managed Redis on free tier | No distributed cache, queue, or shared rate limiting |
-| Neon free Postgres | Single database, connection limits → pool max 10 in TypeORM config |
-| Vercel + Render cross-origin | Cookie `SameSite=None`, strict `CORS_ORIGIN` (no trailing slash), CSRF origin check |
-| No budget for S3/CDN/WAF/Sentry | Uploads on disk; logs to stdout; no APM or error tracking SaaS |
-| Assignment scope / time | No real-time layer, search, notifications, admin tools, or full test pyramid |
+### 8. Security Hardening
+**Current:** App-level rate limiting and Helmet headers.
 
-These are not oversights — they are explicit cost/complexity trade-offs. The codebase is structured so the main externalizations (cache, uploads, queues) have clear swap points.
+**With paid hosting:**
+- **WAF** (Cloudflare, AWS WAF) — OWASP protection, bot mitigation
+- **DDoS protection** — Cloudflare or AWS Shield
+- **Secrets management** — HashiCorp Vault or AWS Secrets Manager with rotation
 
----
+### 9. CI/CD & Testing
+**Current:** Manual deploy from Git, ad-hoc test scripts.
 
-## 6. Not Implemented (Deferred) — With Rationale
-
-### 6.1 Infrastructure & state
-
-| Gap | Current state | Why deferred | Production path |
-|-----|---------------|--------------|-----------------|
-| **Redis** | In-memory cache, rate limits, lockout | Extra service + cost | Replace `cache.ts`, rate limiter store, and lockout with Redis; enables multi-instance deploy |
-| **Object storage** | Local `uploads/` | Simplicity | Presigned S3/R2 upload; serve via CDN URL stored in `imageUrl` |
-| **Horizontal scaling** | 1 API instance | Stateful in-process design | Load balancer + N instances after Redis externalization |
-| **Read replicas** | Single Neon primary | Free tier + low traffic | Route feed reads to replica; writes stay on primary |
-| **PgBouncer / pooler** | TypeORM pool (max 10) | Neon provides pooled URL | Tune pool size per instance × replica count |
-
-### 6.2 Async & real-time
-
-| Gap | Current state | Why deferred | Production path |
-|-----|---------------|--------------|-----------------|
-| **Background jobs** | All work synchronous in request | No queue infrastructure | BullMQ + Redis: image resize, email, token cleanup, count reconciliation |
-| **WebSockets / SSE** | Client refetches on action | Complexity + connection cost on free tier | Socket.IO or SSE for live likes, comments, notifications |
-| **Push / email** | None | Out of scope | Transactional email + in-app notification store |
-
-### 6.3 Observability & reliability
-
-| Gap | Current state | Why deferred | Production path |
-|-----|---------------|--------------|-----------------|
-| **Centralized logging** | JSON to stdout | Render captures logs | Datadog / Loki + log drains |
-| **APM / tracing** | None | Cost | OpenTelemetry → Datadog/New Relic; trace DB and HTTP |
-| **Error tracking** | Error boundaries + console | Cost | Sentry (frontend + backend) with source maps |
-| **Alerting** | Manual health checks | No on-call stack | PagerDuty/Opsgenie on error rate, latency p99, memory |
-| **SLOs / SLIs** | None | Early stage | Define availability and latency targets per endpoint |
-
-### 6.4 Security & compliance
-
-| Gap | Current state | Why deferred | Production path |
-|-----|---------------|--------------|-----------------|
-| **WAF / DDoS** | App-level rate limits only | Free tier | Cloudflare or AWS WAF in front of API |
-| **Secrets management** | Render/Vercel env vars | Adequate for demo | Vault / AWS Secrets Manager + rotation |
-| **Audit log** | Request logs only | Scope | Immutable audit table for auth and moderation actions |
-| **Content moderation** | None | Scope | Reporting queue, admin review, automated scanning |
-| **Refresh token cleanup** | Expired rows remain until touched | No cron on free tier | Scheduled job to purge `expires_at < now()` |
-
-### 6.5 Engineering maturity
-
-| Gap | Current state | Why deferred | Production path |
-|-----|---------------|--------------|-----------------|
-| **Automated test suite** | Ad-hoc `tsx` scripts only | Time / scope | Jest/Vitest unit tests; Playwright E2E; CI gate on PR |
-| **CI/CD pipeline** | Manual deploy from Git | Simplicity | GitHub Actions: lint, test, build, deploy staging → prod |
-| **Staging environment** | None | Cost | Mirror of prod with separate DB and secrets |
-| **API contract** | README table | Scope | OpenAPI spec + generated client types |
-| **Feature flags** | None | Scope | LaunchDarkly or env-based flags for safe rollout |
-| **Idempotency** | Like POST is not idempotent-keyed | Low risk at current scale | `Idempotency-Key` header for writes |
-
-### 6.6 Product & data model (future scale)
-
-| Gap | Notes |
-|-----|-------|
-| **Full-text search** | Feed is chronological only; no post search (Elasticsearch/Meilisearch) |
-| **Fan-out feed** | Global feed works today; high-follower users would need precomputed timelines |
-| **CQRS / event sourcing** | Not needed until read/write patterns diverge significantly |
-| **Sharding** | Single Postgres sufficient until write throughput becomes the bottleneck |
+**With paid hosting:**
+- Automated test suite (Jest/Vitest unit, Playwright E2E)
+- GitHub Actions pipeline: lint → test → build → deploy
+- Staging environment mirroring production
+- Blue-green or canary deployments for zero-downtime releases
 
 ---
 
-## 7. Scaling Roadmap (Prioritized)
+## Scaling Priority Order
 
-If moving off free tier, this is the order that maximizes reliability per dollar:
+If moving off free tier, this order maximizes reliability per dollar:
 
-### Phase 1 — Fix data loss and multi-instance blockers
-1. **S3/R2 + CDN** for uploads (eliminates ephemeral disk risk)
-2. **Redis** for cache, rate limiting, and login lockout
-3. **Always-on API** with 2+ instances behind a load balancer
-
-### Phase 2 — Operability
-4. **Sentry** + structured log drain
-5. **CI/CD** with tests blocking merge
-6. **Staging** environment
-7. **Cron/worker** for token cleanup and count reconciliation
-
-### Phase 3 — Performance at growth
-8. **Read replica** for feed queries
-9. **Background workers** for image processing and notifications
-10. **CDN cache rules** for API responses where safe (public assets only)
-
-### Phase 4 — Product scale
-11. **WebSockets** for real-time updates
-12. **Search index** for content discovery
-13. **Service extraction** only when team or load justifies it (media, notifications)
+1. **S3/R2 + CDN** — eliminates data loss risk (highest priority)
+2. **Redis** — enables horizontal scaling and persistent rate limits
+3. **Always-on instances** — eliminates cold starts
+4. **Sentry** — catches errors before users report them
+5. **CI/CD with tests** — prevents regressions
+6. **Background workers** — improves response times
+7. **Read replicas** — scales read-heavy feed queries
+8. **WebSockets** — adds real-time UX
 
 ---
 
-## 8. Target Production Architecture
+## Summary
 
-```
-                         ┌──────────────┐
-                         │  Cloudflare  │
-                         │  WAF + CDN   │
-                         └──────┬───────┘
-                                │
-         ┌──────────────────────┼──────────────────────┐
-         ▼                      ▼                      ▼
-  ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
-  │   Vercel    │      │     ALB      │      │  S3 / R2    │
-  │  Next.js    │─────▶│  API × N     │      │  + CDN      │
-  └─────────────┘      └──────┬───────┘      └─────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-        ┌──────────┐   ┌──────────┐   ┌──────────────┐
-        │  Redis   │   │  Worker  │   │   Sentry /   │
-        │ cache/   │   │ (BullMQ) │   │   Datadog    │
-        │ limits   │   └──────────┘   └──────────────┘
-        └──────────┘
-              │
-              ▼
-   ┌──────────────────────┐
-   │ Postgres primary     │──────▶ read replica(s)
-   └──────────────────────┘
-```
+Buddy Script implements production-ready patterns within free-tier constraints: cursor pagination, transactional writes, hashed refresh tokens, and defense-in-depth security.
 
-**Code touch points for Phase 1:**
-- `backend/src/utils/cache.ts` → Redis adapter
-- `backend/src/middleware/rateLimiter.ts` → `rate-limit-redis` store
-- `backend/src/utils/loginLockout.ts` → Redis keys with TTL
-- `backend/src/middleware/upload.middleware.ts` → presigned upload flow
-- `backend/src/utils/postImage.ts` → CDN URL resolution instead of local serve
+The gaps are deliberate cost/complexity trade-offs with clear upgrade paths. The codebase is structured so cache (`cache.ts`), rate limiting (`rateLimiter.ts`), and uploads (`upload.middleware.ts`) can be swapped to Redis/S3 without rewriting business logic.
 
----
-
-## 9. Summary
-
-Buddy Script implements a coherent social-feed domain model with security and performance patterns appropriate for a single-instance deployment: cursor pagination, transactional writes, hashed refresh tokens, and defense-in-depth on the API boundary.
-
-What it deliberately does **not** do — because of free-tier hosting and assignment scope — is externalize state (Redis), persist media (S3), run background workers, or provide production-grade observability and CI. Those gaps are well-defined and map to a clear, phased upgrade path without rewriting the core domain logic.
-
-The highest-priority production change is **moving uploads off ephemeral disk**. The second is **Redis** so the API can scale horizontally without broken rate limits and inconsistent caches.
+**Highest-priority production changes:** persistent uploads (S3) and Redis for horizontal scaling.
